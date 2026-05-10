@@ -1,0 +1,1156 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MyWealth — Personal Finance</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg-base: #0a0d0f;
+    --bg-card: #111518;
+    --bg-elevated: #181d21;
+    --border: #1f2a2f;
+    --emerald: #10b981;
+    --emerald-dim: #065f46;
+    --rose: #f43f5e;
+    --rose-dim: #881337;
+    --amber: #f59e0b;
+    --sky: #38bdf8;
+    --text-primary: #e8edf0;
+    --text-muted: #5a6a72;
+    --text-mid: #8fa0a8;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { background: var(--bg-base); color: var(--text-primary); font-family: 'Syne', sans-serif; margin: 0; padding: 0; min-height: 100vh; }
+  .mono { font-family: 'DM Mono', monospace; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: var(--bg-base); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+  /* Cards */
+  .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; }
+  .card-elevated { background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 12px; }
+
+  /* Inputs */
+  .inp {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text-primary);
+    font-family: 'DM Mono', monospace;
+    font-size: 14px;
+    padding: 10px 14px;
+    width: 100%;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .inp:focus { border-color: var(--emerald); }
+  .inp::placeholder { color: var(--text-muted); }
+  select.inp option { background: var(--bg-elevated); }
+
+  /* Buttons */
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; border-radius: 10px; font-family: 'Syne', sans-serif; font-weight: 700; font-size: 14px; padding: 11px 18px; border: none; cursor: pointer; transition: all 0.18s; white-space: nowrap; }
+  .btn-emerald { background: var(--emerald); color: #000; }
+  .btn-emerald:hover { background: #34d399; }
+  .btn-rose { background: var(--rose); color: #fff; }
+  .btn-rose:hover { background: #fb7185; }
+  .btn-ghost { background: transparent; color: var(--text-mid); border: 1px solid var(--border); }
+  .btn-ghost:hover { border-color: var(--text-mid); color: var(--text-primary); }
+  .btn-amber { background: var(--amber); color: #000; }
+  .btn-amber:hover { background: #fbbf24; }
+  .btn-sky { background: var(--sky); color: #000; }
+  .btn-sky:hover { background: #7dd3fc; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* Nav tabs */
+  .nav-tab { flex: 1; padding: 10px 4px; text-align: center; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); border-bottom: 2px solid transparent; cursor: pointer; transition: all 0.2s; user-select: none; }
+  .nav-tab.active { color: var(--emerald); border-bottom-color: var(--emerald); }
+
+  /* Pill badge */
+  .badge { display: inline-block; border-radius: 999px; padding: 2px 10px; font-size: 11px; font-weight: 700; font-family: 'DM Mono', monospace; }
+  .badge-emerald { background: var(--emerald-dim); color: var(--emerald); }
+  .badge-rose { background: var(--rose-dim); color: var(--rose); }
+  .badge-amber { background: #451a03; color: var(--amber); }
+  .badge-sky { background: #0c2a3a; color: var(--sky); }
+
+  /* Toggle switch */
+  .toggle-track { width: 44px; height: 24px; background: var(--border); border-radius: 12px; position: relative; cursor: pointer; transition: background 0.2s; }
+  .toggle-track.on { background: var(--emerald); }
+  .toggle-thumb { position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; background: #fff; border-radius: 50%; transition: transform 0.2s; }
+  .toggle-track.on .toggle-thumb { transform: translateX(20px); }
+
+  /* Ledger rows */
+  .ledger-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .ledger-row:last-child { border-bottom: none; }
+
+  /* Noise overlay for depth */
+  .noise::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0.4;
+  }
+
+  /* Chart container */
+  .chart-wrap { position: relative; width: 100%; height: 220px; }
+
+  /* Section fade-in */
+  .tab-section { animation: fadeUp 0.25s ease both; }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* Glow stat numbers */
+  .glow-emerald { text-shadow: 0 0 20px rgba(16,185,129,0.5); }
+  .glow-rose { text-shadow: 0 0 20px rgba(244,63,94,0.5); }
+
+  /* Toast */
+  #toast { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 10px; padding: 10px 20px; font-size: 13px; font-weight: 600; opacity: 0; transition: all 0.3s; pointer-events: none; z-index: 10000; white-space: nowrap; }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* Simulation mode header */
+  .sim-banner { background: linear-gradient(135deg, #0c1a2e, #0d1f15); border: 1px solid #1e3a5f; }
+
+  /* Responsive grid */
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  @media(min-width: 640px) { .stat-grid { grid-template-columns: repeat(4, 1fr); } }
+
+  /* Scrollable ledger */
+  .ledger-scroll { max-height: 260px; overflow-y: auto; padding-right: 4px; }
+
+  /* Delete btn */
+  .del-btn { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 16px; padding: 2px 6px; border-radius: 6px; transition: color 0.15s, background 0.15s; flex-shrink: 0; }
+  .del-btn:hover { color: var(--rose); background: rgba(244,63,94,0.1); }
+
+  /* Sub category pill */
+  .cat-pill { font-size: 11px; padding: 2px 8px; border-radius: 6px; font-family: 'DM Mono', monospace; font-weight: 500; }
+  .cat-need { background: #1a2a1e; color: #6ee7b7; }
+  .cat-want { background: #2a1a1e; color: #fda4af; }
+  .cat-income { background: #1a2218; color: var(--emerald); }
+  .cat-sub { background: #1a1a2a; color: #a78bfa; }
+  .cat-expected { background: #1f1a00; color: var(--amber); }
+</style>
+</head>
+<body class="noise">
+
+<!-- ── Toast ─────────────────────────────────────────── -->
+<div id="toast"></div>
+
+<!-- ── App Shell ──────────────────────────────────────── -->
+<div id="app" class="max-w-xl mx-auto pb-24 px-3 pt-4">
+
+  <!-- Header -->
+  <header class="flex items-center justify-between mb-5">
+    <div>
+      <p class="text-xs font-700 tracking-widest text-emerald-500 uppercase mono mb-0.5">MyWealth</p>
+      <h1 class="text-2xl font-800 leading-tight" style="font-weight:800">Finance<br><span style="color:var(--emerald)">Manager</span></h1>
+    </div>
+    <div class="flex gap-2">
+      <button onclick="exportData()" class="btn btn-ghost" title="Export JSON">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <span class="hidden sm:inline">Export</span>
+      </button>
+      <label class="btn btn-ghost cursor-pointer" title="Import JSON">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        <span class="hidden sm:inline">Import</span>
+        <input type="file" accept=".json" class="hidden" onchange="importData(event)" />
+      </label>
+    </div>
+  </header>
+
+  <!-- Nav Tabs -->
+  <nav class="flex border-b mb-5" style="border-color:var(--border)">
+    <div class="nav-tab active" data-tab="dashboard" onclick="switchTab('dashboard')">Dashboard</div>
+    <div class="nav-tab" data-tab="ledger" onclick="switchTab('ledger')">Ledger</div>
+    <div class="nav-tab" data-tab="subscriptions" onclick="switchTab('subscriptions')">Subs</div>
+    <div class="nav-tab" data-tab="simulation" onclick="switchTab('simulation')">
+      <span style="color:var(--sky)">⚗ Sim</span>
+    </div>
+  </nav>
+
+  <!-- ══════════════════════════════════════════════════ -->
+  <!-- TAB: DASHBOARD                                     -->
+  <!-- ══════════════════════════════════════════════════ -->
+  <section id="tab-dashboard" class="tab-section">
+
+    <!-- Stat cards -->
+    <div class="stat-grid mb-4">
+      <div class="card p-4">
+        <p class="text-xs text-muted mb-1 uppercase tracking-wider" style="color:var(--text-muted)">Balance</p>
+        <p id="stat-balance" class="text-xl font-800 mono glow-emerald" style="color:var(--emerald)">₱0</p>
+      </div>
+      <div class="card p-4">
+        <p class="text-xs text-muted mb-1 uppercase tracking-wider" style="color:var(--text-muted)">Monthly Out</p>
+        <p id="stat-monthly-out" class="text-xl font-800 mono glow-rose" style="color:var(--rose)">₱0</p>
+      </div>
+      <div class="card p-4">
+        <p class="text-xs text-muted mb-1 uppercase tracking-wider" style="color:var(--text-muted)">Expected</p>
+        <p id="stat-expected" class="text-xl font-800 mono" style="color:var(--amber)">₱0</p>
+      </div>
+      <div class="card p-4">
+        <p class="text-xs text-muted mb-1 uppercase tracking-wider" style="color:var(--text-muted)">Burn Rate/mo</p>
+        <p id="stat-burn" class="text-xl font-800 mono" style="color:var(--sky)">₱0</p>
+      </div>
+    </div>
+
+    <!-- Balance trend chart -->
+    <div class="card p-4 mb-4">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="font-700 text-sm uppercase tracking-wider" style="color:var(--text-mid)">Balance Trend</h2>
+        <span class="badge badge-emerald">6 Months</span>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="balanceChart"></canvas>
+      </div>
+    </div>
+
+    <!-- Expense breakdown chart -->
+    <div class="card p-4 mb-4">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="font-700 text-sm uppercase tracking-wider" style="color:var(--text-mid)">Expense Breakdown</h2>
+        <span class="badge badge-rose">This Month</span>
+      </div>
+      <div class="chart-wrap" style="height:180px">
+        <canvas id="breakdownChart"></canvas>
+      </div>
+      <div id="breakdown-legend" class="flex gap-4 mt-3 flex-wrap justify-center text-xs mono" style="color:var(--text-mid)"></div>
+    </div>
+
+    <!-- Expected money list -->
+    <div class="card p-4">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="font-700 text-sm uppercase tracking-wider" style="color:var(--text-mid)">Expected Income</h2>
+        <button onclick="switchTab('ledger'); openExpectedForm()" class="btn btn-amber" style="padding:6px 12px;font-size:12px">+ Add</button>
+      </div>
+      <div id="expected-list" class="text-sm" style="color:var(--text-mid)">
+        <p class="text-xs text-center py-4" style="color:var(--text-muted)">No expected income tracked yet.</p>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ══════════════════════════════════════════════════ -->
+  <!-- TAB: LEDGER                                        -->
+  <!-- ══════════════════════════════════════════════════ -->
+  <section id="tab-ledger" class="tab-section hidden">
+
+    <!-- Add transaction form -->
+    <div class="card p-4 mb-4">
+      <h2 class="font-700 text-sm uppercase tracking-wider mb-4" style="color:var(--text-mid)">New Transaction</h2>
+      <div class="grid grid-cols-2 gap-2 mb-2">
+        <select id="tx-type" class="inp">
+          <option value="in">💚 Money In</option>
+          <option value="out">🔴 Money Out</option>
+          <option value="expected">🟡 Expected</option>
+        </select>
+        <select id="tx-category" class="inp">
+          <option value="income">Income</option>
+          <option value="need">Fixed Need</option>
+          <option value="want">Variable Want</option>
+          <option value="expected">Expected</option>
+        </select>
+      </div>
+      <input id="tx-desc" class="inp mb-2" type="text" placeholder="Description (e.g. Salary, Groceries)" />
+      <div class="grid grid-cols-2 gap-2 mb-3">
+        <input id="tx-amount" class="inp" type="number" min="0" step="0.01" placeholder="Amount (₱)" />
+        <input id="tx-date" class="inp" type="date" />
+      </div>
+      <button onclick="addTransaction()" class="btn btn-emerald w-full">Add Transaction</button>
+    </div>
+
+    <!-- Ledger list -->
+    <div class="card p-4">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="font-700 text-sm uppercase tracking-wider" style="color:var(--text-mid)">All Transactions</h2>
+        <select id="ledger-filter" class="inp" style="width:auto;padding:6px 10px;font-size:12px" onchange="renderLedger()">
+          <option value="all">All</option>
+          <option value="in">Money In</option>
+          <option value="out">Money Out</option>
+          <option value="expected">Expected</option>
+        </select>
+      </div>
+      <div id="ledger-list" class="ledger-scroll">
+        <p class="text-xs text-center py-4" style="color:var(--text-muted)">No transactions yet. Add one above!</p>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ══════════════════════════════════════════════════ -->
+  <!-- TAB: SUBSCRIPTIONS                                 -->
+  <!-- ══════════════════════════════════════════════════ -->
+  <section id="tab-subscriptions" class="tab-section hidden">
+
+    <div class="card p-4 mb-4">
+      <h2 class="font-700 text-sm uppercase tracking-wider mb-4" style="color:var(--text-mid)">Add Subscription</h2>
+      <input id="sub-name" class="inp mb-2" type="text" placeholder="Service name (e.g. Spotify, Netflix)" />
+      <div class="grid grid-cols-2 gap-2 mb-2">
+        <input id="sub-amount" class="inp" type="number" min="0" step="0.01" placeholder="Amount (₱)" />
+        <select id="sub-billing" class="inp">
+          <option value="monthly">Monthly</option>
+          <option value="weekly">Weekly</option>
+          <option value="yearly">Yearly</option>
+        </select>
+      </div>
+      <input id="sub-date" class="inp mb-3" type="number" min="1" max="31" placeholder="Billing day of month (1–31)" />
+      <button onclick="addSubscription()" class="btn btn-sky w-full">Add Subscription</button>
+    </div>
+
+    <!-- Sub summary -->
+    <div class="card p-4 mb-4">
+      <div class="flex items-center justify-between mb-1">
+        <span class="text-sm font-700" style="color:var(--text-mid)">Monthly Burn Rate (Subs)</span>
+        <span id="sub-total" class="mono font-800 text-lg" style="color:var(--sky)">₱0</span>
+      </div>
+      <p class="text-xs" style="color:var(--text-muted)">Auto-included in monthly out calculation</p>
+    </div>
+
+    <!-- Sub list -->
+    <div class="card p-4">
+      <h2 class="font-700 text-sm uppercase tracking-wider mb-3" style="color:var(--text-mid)">Active Subscriptions</h2>
+      <div id="sub-list">
+        <p class="text-xs text-center py-4" style="color:var(--text-muted)">No subscriptions yet.</p>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ══════════════════════════════════════════════════ -->
+  <!-- TAB: SIMULATION                                    -->
+  <!-- ══════════════════════════════════════════════════ -->
+  <section id="tab-simulation" class="tab-section hidden">
+
+    <!-- Banner -->
+    <div class="sim-banner card p-4 mb-4 flex items-start gap-3">
+      <span style="font-size:28px">⚗️</span>
+      <div>
+        <p class="font-700 text-sm" style="color:var(--sky)">Simulation Sandbox</p>
+        <p class="text-xs mt-1" style="color:var(--text-muted)">Test "What If" scenarios. No real data is changed. See how choices affect your next 6 months.</p>
+      </div>
+    </div>
+
+    <!-- What-If Expense -->
+    <div class="card p-4 mb-4">
+      <h2 class="font-700 text-sm uppercase tracking-wider mb-4" style="color:var(--text-mid)">📦 What-If Purchase</h2>
+      <input id="sim-name" class="inp mb-2" type="text" placeholder="Item name (e.g. Gaming PC)" />
+      <div class="grid grid-cols-2 gap-2 mb-2">
+        <input id="sim-total" class="inp" type="number" min="0" step="0.01" placeholder="Total cost (₱)" />
+        <select id="sim-months" class="inp">
+          <option value="1">Pay Lump Sum</option>
+          <option value="2">2-Month Plan</option>
+          <option value="3" selected>3-Month Plan</option>
+          <option value="6">6-Month Plan</option>
+          <option value="12">12-Month Plan</option>
+        </select>
+      </div>
+      <input id="sim-start" class="inp mb-3" type="month" />
+      <button onclick="addSimExpense()" class="btn btn-rose w-full">Add What-If Expense</button>
+      <div id="sim-expense-list" class="mt-3"></div>
+    </div>
+
+    <!-- Simulation Income -->
+    <div class="card p-4 mb-4">
+      <h2 class="font-700 text-sm uppercase tracking-wider mb-4" style="color:var(--text-mid)">💰 Simulation Income</h2>
+      <input id="siminc-desc" class="inp mb-2" type="text" placeholder="Income source (e.g. Freelance gig)" />
+      <div class="grid grid-cols-2 gap-2 mb-3">
+        <input id="siminc-amount" class="inp" type="number" min="0" step="0.01" placeholder="Amount (₱)" />
+        <select id="siminc-freq" class="inp">
+          <option value="weekly">Weekly</option>
+          <option value="biweekly">Bi-weekly</option>
+          <option value="monthly">Monthly</option>
+        </select>
+      </div>
+      <button onclick="addSimIncome()" class="btn btn-emerald w-full">Add Sim Income</button>
+      <div id="sim-income-list" class="mt-3"></div>
+    </div>
+
+    <!-- Projected chart -->
+    <div class="card p-4 mb-4">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="font-700 text-sm uppercase tracking-wider" style="color:var(--text-mid)">Projection Chart</h2>
+        <div class="flex gap-2">
+          <span class="badge badge-emerald text-xs">Actual</span>
+          <span class="badge badge-sky text-xs">Sim</span>
+        </div>
+      </div>
+      <div class="chart-wrap" style="height:240px">
+        <canvas id="simChart"></canvas>
+      </div>
+    </div>
+
+    <!-- Projected stats -->
+    <div class="grid grid-cols-2 gap-3 mb-4">
+      <div class="card p-4">
+        <p class="text-xs mb-1 uppercase tracking-wider" style="color:var(--text-muted)">Proj. Balance (6mo)</p>
+        <p id="sim-proj-bal" class="text-xl font-800 mono" style="color:var(--sky)">₱0</p>
+      </div>
+      <div class="card p-4">
+        <p class="text-xs mb-1 uppercase tracking-wider" style="color:var(--text-muted)">Difference</p>
+        <p id="sim-diff" class="text-xl font-800 mono">₱0</p>
+      </div>
+    </div>
+
+    <!-- Reset sim -->
+    <button onclick="clearSimulation()" class="btn btn-ghost w-full">🗑 Clear Simulation Data</button>
+
+  </section>
+
+</div><!-- /app -->
+
+<!-- ── Bottom Nav (mobile) ─────────────────────────────── -->
+<nav class="fixed bottom-0 left-0 right-0 flex justify-around items-center py-3 px-2" style="background:rgba(10,13,15,0.95);backdrop-filter:blur(12px);border-top:1px solid var(--border)">
+  <button onclick="switchTab('dashboard')" class="flex flex-col items-center gap-0.5 text-xs font-700" id="bnav-dashboard" style="color:var(--emerald)">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+    Dashboard
+  </button>
+  <button onclick="switchTab('ledger')" class="flex flex-col items-center gap-0.5 text-xs font-700" id="bnav-ledger" style="color:var(--text-muted)">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+    Ledger
+  </button>
+  <button onclick="switchTab('subscriptions')" class="flex flex-col items-center gap-0.5 text-xs font-700" id="bnav-subscriptions" style="color:var(--text-muted)">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+    Subs
+  </button>
+  <button onclick="switchTab('simulation')" class="flex flex-col items-center gap-0.5 text-xs font-700" id="bnav-simulation" style="color:var(--text-muted)">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+    Sim
+  </button>
+</nav>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- JAVASCRIPT                                            -->
+<!-- ══════════════════════════════════════════════════════ -->
+<script>
+// ╔══════════════════════════════════════════════════════╗
+// ║  STATE — All app data lives here                     ║
+// ╚══════════════════════════════════════════════════════╝
+let state = {
+  transactions: [],   // { id, type:'in'|'out'|'expected', category:'income'|'need'|'want'|'expected', desc, amount, date }
+  subscriptions: [],  // { id, name, amount, billing:'monthly'|'weekly'|'yearly', day }
+  simulation: {
+    expenses: [],     // { id, name, total, months, startMonth }
+    incomes: []       // { id, desc, amount, freq:'weekly'|'biweekly'|'monthly' }
+  }
+};
+
+// ╔══════════════════════════════════════════════════════╗
+// ║  PERSISTENCE — localStorage save/load               ║
+// ╚══════════════════════════════════════════════════════╝
+function saveState() {
+  localStorage.setItem('mywealth_v2', JSON.stringify(state));
+}
+
+function loadState() {
+  const raw = localStorage.getItem('mywealth_v2');
+  if (raw) {
+    try { state = JSON.parse(raw); }
+    catch(e) { console.warn('Failed to parse saved state.'); }
+  }
+  // Ensure simulation sub-object exists (migration safety)
+  if (!state.simulation) state.simulation = { expenses: [], incomes: [] };
+}
+
+// ╔══════════════════════════════════════════════════════╗
+// ║  HELPERS                                             ║
+// ╚══════════════════════════════════════════════════════╝
+// Generate a random short ID
+function uid() { return Math.random().toString(36).slice(2, 9); }
+
+// Format number as peso currency
+function peso(n) {
+  return '₱' + Number(n).toLocaleString('en-PH', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+}
+
+// Show toast notification
+function toast(msg, color = 'var(--emerald)') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.style.color = color;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2400);
+}
+
+// Get today's date as yyyy-mm-dd
+function today() { return new Date().toISOString().split('T')[0]; }
+
+// Get current year-month as yyyy-mm
+function thisMonth() { return new Date().toISOString().slice(0, 7); }
+
+// ╔══════════════════════════════════════════════════════╗
+// ║  CALCULATIONS                                        ║
+// ╚══════════════════════════════════════════════════════╝
+
+// Current real balance = sum(in) - sum(out), excluding 'expected'
+function calcBalance() {
+  return state.transactions.reduce((sum, tx) => {
+    if (tx.type === 'in') return sum + Number(tx.amount);
+    if (tx.type === 'out') return sum - Number(tx.amount);
+    return sum; // 'expected' not counted in real balance
+  }, 0);
+}
+
+// Total expected income
+function calcExpected() {
+  return state.transactions
+    .filter(tx => tx.type === 'expected')
+    .reduce((sum, tx) => sum + Number(tx.amount), 0);
+}
+
+// Convert subscription billing to monthly equivalent
+function subMonthlyAmount(sub) {
+  switch (sub.billing) {
+    case 'weekly':  return Number(sub.amount) * 4.33;
+    case 'yearly':  return Number(sub.amount) / 12;
+    default:        return Number(sub.amount); // monthly
+  }
+}
+
+// Total monthly subscription cost
+function calcSubMonthly() {
+  return state.subscriptions.reduce((sum, s) => sum + subMonthlyAmount(s), 0);
+}
+
+// Monthly outflow from transactions (current month)
+function calcMonthlyOut() {
+  const m = thisMonth();
+  const txOut = state.transactions
+    .filter(tx => tx.type === 'out' && tx.date && tx.date.startsWith(m))
+    .reduce((sum, tx) => sum + Number(tx.amount), 0);
+  return txOut + calcSubMonthly(); // include subscriptions
+}
+
+// Monthly inflow from transactions (current month)
+function calcMonthlyIn() {
+  const m = thisMonth();
+  return state.transactions
+    .filter(tx => tx.type === 'in' && tx.date && tx.date.startsWith(m))
+    .reduce((sum, tx) => sum + Number(tx.amount), 0);
+}
+
+// Expense categories for this month
+function calcBreakdown() {
+  const m = thisMonth();
+  const need = state.transactions
+    .filter(tx => tx.type === 'out' && tx.category === 'need' && tx.date && tx.date.startsWith(m))
+    .reduce((s, tx) => s + Number(tx.amount), 0) + calcSubMonthly();
+  const want = state.transactions
+    .filter(tx => tx.type === 'out' && tx.category === 'want' && tx.date && tx.date.startsWith(m))
+    .reduce((s, tx) => s + Number(tx.amount), 0);
+  return { need, want };
+}
+
+// ╔══════════════════════════════════════════════════════╗
+// ║  PROJECTION ENGINE                                   ║
+// ╠══════════════════════════════════════════════════════╣
+// Returns array of 7 data points (this month + 6 forward)
+// Each: { label, actual, simulated }
+function buildProjection() {
+  const balance = calcBalance();
+  const monthlyNet = calcMonthlyIn() - calcMonthlyOut();
+
+  // Build labels for next 6 months
+  const labels = [];
+  const dates = [];
+  const now = new Date();
+  for (let i = 0; i <= 6; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+    labels.push(d.toLocaleString('default', { month: 'short', year: '2-digit' }));
+    dates.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  }
+
+  // Actual trajectory (no simulation)
+  const actual = [balance];
+  for (let i = 1; i <= 6; i++) {
+    actual.push(actual[i - 1] + monthlyNet);
+  }
+
+  // Simulation trajectory
+  // Calculate monthly sim income
+  let simMonthlyIncome = 0;
+  state.simulation.incomes.forEach(inc => {
+    switch (inc.freq) {
+      case 'weekly':    simMonthlyIncome += Number(inc.amount) * 4.33; break;
+      case 'biweekly':  simMonthlyIncome += Number(inc.amount) * 2.17; break;
+      default:          simMonthlyIncome += Number(inc.amount);
+    }
+  });
+
+  // Map sim expenses into monthly costs per month label
+  const simExpenseByMonth = {};
+  state.simulation.expenses.forEach(exp => {
+    const monthly = Number(exp.total) / Number(exp.months);
+    const start = exp.startMonth || thisMonth();
+    for (let m = 0; m < Number(exp.months); m++) {
+      const [y, mo] = start.split('-').map(Number);
+      const d = new Date(y, mo - 1 + m, 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      simExpenseByMonth[key] = (simExpenseByMonth[key] || 0) + monthly;
+    }
+  });
+
+  const simulated = [balance];
+  for (let i = 1; i <= 6; i++) {
+    const monthKey = dates[i];
+    const simExpense = simExpenseByMonth[monthKey] || 0;
+    const simNet = monthlyNet + simMonthlyIncome - simExpense;
+    simulated.push(simulated[i - 1] + simNet);
+  }
+
+  return { labels, actual, simulated };
+}
+
+// ╔══════════════════════════════════════════════════════╗
+// ║  CHART INSTANCES                                     ║
+// ╚══════════════════════════════════════════════════════╝
+let balanceChartInstance = null;
+let breakdownChartInstance = null;
+let simChartInstance = null;
+
+const chartDefaults = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: { legend: { display: false }, tooltip: { backgroundColor: '#181d21', titleColor: '#e8edf0', bodyColor: '#8fa0a8', borderColor: '#1f2a2f', borderWidth: 1 } },
+  scales: {
+    x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#5a6a72', font: { family: 'DM Mono', size: 10 } } },
+    y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#5a6a72', font: { family: 'DM Mono', size: 10 }, callback: v => '₱' + v.toLocaleString() } }
+  }
+};
+
+function renderBalanceChart() {
+  const ctx = document.getElementById('balanceChart').getContext('2d');
+  const { labels, actual } = buildProjection();
+
+  if (balanceChartInstance) balanceChartInstance.destroy();
+
+  const gradient = ctx.createLinearGradient(0, 0, 0, 220);
+  gradient.addColorStop(0, 'rgba(16,185,129,0.3)');
+  gradient.addColorStop(1, 'rgba(16,185,129,0)');
+
+  balanceChartInstance = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Balance',
+        data: actual,
+        borderColor: '#10b981',
+        backgroundColor: gradient,
+        borderWidth: 2.5,
+        pointBackgroundColor: '#10b981',
+        pointRadius: 4,
+        tension: 0.4,
+        fill: true
+      }]
+    },
+    options: { ...chartDefaults }
+  });
+}
+
+function renderBreakdownChart() {
+  const ctx = document.getElementById('breakdownChart').getContext('2d');
+  const { need, want } = calcBreakdown();
+  const income = calcMonthlyIn();
+
+  if (breakdownChartInstance) breakdownChartInstance.destroy();
+
+  const data = [income, need, want];
+  const labels = ['Income', 'Fixed Needs', 'Variable Wants'];
+  const colors = ['#10b981', '#38bdf8', '#f43f5e'];
+
+  if (data.every(v => v === 0)) {
+    document.getElementById('breakdown-legend').innerHTML = '<span style="color:var(--text-muted)">No data this month</span>';
+  } else {
+    document.getElementById('breakdown-legend').innerHTML = labels.map((l, i) =>
+      `<span style="color:${colors[i]}">■ ${l}: ${peso(data[i])}</span>`
+    ).join('');
+  }
+
+  breakdownChartInstance = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{ data, backgroundColor: colors, borderWidth: 0, hoverOffset: 6 }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { backgroundColor: '#181d21', titleColor: '#e8edf0', bodyColor: '#8fa0a8', borderColor: '#1f2a2f', borderWidth: 1 }
+      },
+      cutout: '68%'
+    }
+  });
+}
+
+function renderSimChart() {
+  const ctx = document.getElementById('simChart').getContext('2d');
+  const { labels, actual, simulated } = buildProjection();
+
+  if (simChartInstance) simChartInstance.destroy();
+
+  simChartInstance = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Actual Trajectory',
+          data: actual,
+          borderColor: '#10b981',
+          backgroundColor: 'rgba(16,185,129,0.08)',
+          borderWidth: 2,
+          pointBackgroundColor: '#10b981',
+          pointRadius: 3,
+          tension: 0.4,
+          fill: true
+        },
+        {
+          label: 'Simulated Trajectory',
+          data: simulated,
+          borderColor: '#38bdf8',
+          backgroundColor: 'rgba(56,189,248,0.08)',
+          borderWidth: 2,
+          borderDash: [5, 3],
+          pointBackgroundColor: '#38bdf8',
+          pointRadius: 3,
+          tension: 0.4,
+          fill: true
+        }
+      ]
+    },
+    options: { ...chartDefaults }
+  });
+
+  // Update projection stats
+  const projBal = simulated[6];
+  const diff = simulated[6] - actual[6];
+  document.getElementById('sim-proj-bal').textContent = peso(projBal);
+  const diffEl = document.getElementById('sim-diff');
+  diffEl.textContent = (diff >= 0 ? '+' : '') + peso(diff);
+  diffEl.style.color = diff >= 0 ? 'var(--emerald)' : 'var(--rose)';
+}
+
+// ╔══════════════════════════════════════════════════════╗
+// ║  DASHBOARD RENDER                                    ║
+// ╚══════════════════════════════════════════════════════╝
+function renderDashboard() {
+  // Stats
+  document.getElementById('stat-balance').textContent = peso(calcBalance());
+  document.getElementById('stat-monthly-out').textContent = peso(calcMonthlyOut());
+  document.getElementById('stat-expected').textContent = peso(calcExpected());
+  document.getElementById('stat-burn').textContent = peso(calcSubMonthly());
+
+  // Expected list
+  const expectedTxs = state.transactions.filter(tx => tx.type === 'expected');
+  const el = document.getElementById('expected-list');
+  if (expectedTxs.length === 0) {
+    el.innerHTML = '<p class="text-xs text-center py-4" style="color:var(--text-muted)">No expected income tracked yet.</p>';
+  } else {
+    el.innerHTML = expectedTxs.map(tx => `
+      <div class="ledger-row" id="exp-row-${tx.id}">
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 mb-0.5">
+            <span class="badge badge-amber">Expected</span>
+          </div>
+          <p class="text-sm font-600 truncate">${escHtml(tx.desc)}</p>
+          <p class="text-xs mono" style="color:var(--text-muted)">${tx.date || 'No date'}</p>
+        </div>
+        <span class="mono font-700 text-sm flex-shrink-0 mr-2" style="color:var(--amber)">${peso(tx.amount)}</span>
+        <button
+          onclick="receiveExpected('${tx.id}')"
+          class="btn btn-emerald flex-shrink-0"
+          style="padding:6px 10px;font-size:11px;gap:4px"
+          title="Mark as received — moves to actual balance">
+          ✓ Got it
+        </button>
+      </div>
+    `).join('');
+  }
+
+  renderBalanceChart();
+  renderBreakdownChart();
+}
+
+// ╔══════════════════════════════════════════════════════╗
+// ║  LEDGER RENDER                                       ║
+// ╚══════════════════════════════════════════════════════╝
+function renderLedger() {
+  const filter = document.getElementById('ledger-filter').value;
+  let txs = [...state.transactions].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  if (filter !== 'all') txs = txs.filter(tx => tx.type === filter);
+
+  const el = document.getElementById('ledger-list');
+  if (txs.length === 0) {
+    el.innerHTML = '<p class="text-xs text-center py-4" style="color:var(--text-muted)">No transactions found.</p>';
+    return;
+  }
+
+  el.innerHTML = txs.map(tx => {
+    const isIn = tx.type === 'in';
+    const isExp = tx.type === 'expected';
+    const amtColor = isIn ? 'var(--emerald)' : isExp ? 'var(--amber)' : 'var(--rose)';
+    const prefix = isIn ? '+' : isExp ? '~' : '-';
+    const catClass = { income: 'cat-income', need: 'cat-need', want: 'cat-want', expected: 'cat-expected' }[tx.category] || 'cat-want';
+    const catLabel = { income: 'Income', need: 'Fixed Need', want: 'Want', expected: 'Expected' }[tx.category] || tx.category;
+
+    // Show "Got it" button only for expected entries
+    const receivedBtn = isExp
+      ? `<button onclick="receiveExpected('${tx.id}')" class="btn btn-emerald flex-shrink-0" style="padding:5px 9px;font-size:11px" title="Mark as received">✓ Got it</button>`
+      : '';
+
+    return `
+      <div class="ledger-row" id="exp-row-${tx.id}">
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 mb-0.5">
+            <span class="cat-pill ${catClass}">${catLabel}</span>
+          </div>
+          <p class="text-sm font-600 truncate">${escHtml(tx.desc)}</p>
+          <p class="text-xs mono" style="color:var(--text-muted)">${tx.date || '—'}</p>
+        </div>
+        <span class="mono font-700 text-sm flex-shrink-0" style="color:${amtColor}">${prefix}${peso(tx.amount)}</span>
+        ${receivedBtn}
+        <button class="del-btn" onclick="deleteTransaction('${tx.id}')" title="Delete">✕</button>
+      </div>
+    `;
+  }).join('');
+}
+
+// ╔══════════════════════════════════════════════════════╗
+// ║  SUBSCRIPTIONS RENDER                                ║
+// ╚══════════════════════════════════════════════════════╝
+function renderSubscriptions() {
+  document.getElementById('sub-total').textContent = peso(calcSubMonthly());
+
+  const el = document.getElementById('sub-list');
+  if (state.subscriptions.length === 0) {
+    el.innerHTML = '<p class="text-xs text-center py-4" style="color:var(--text-muted)">No subscriptions yet.</p>';
+    return;
+  }
+
+  el.innerHTML = state.subscriptions.map(sub => {
+    const monthly = subMonthlyAmount(sub);
+    return `
+      <div class="ledger-row">
+        <div class="flex-1">
+          <p class="text-sm font-600">${escHtml(sub.name)}</p>
+          <p class="text-xs mono" style="color:var(--text-muted)">${peso(sub.amount)} / ${sub.billing} · Billed on day ${sub.day || '?'}</p>
+        </div>
+        <div class="text-right flex-shrink-0 mr-2">
+          <p class="mono text-sm font-700" style="color:var(--sky)">${peso(monthly)}<span class="text-xs font-400">/mo</span></p>
+        </div>
+        <button class="del-btn" onclick="deleteSubscription('${sub.id}')" title="Delete">✕</button>
+      </div>
+    `;
+  }).join('');
+}
+
+// ╔══════════════════════════════════════════════════════╗
+// ║  SIMULATION RENDER                                   ║
+// ╚══════════════════════════════════════════════════════╝
+function renderSimulation() {
+  // Sim expenses list
+  const expEl = document.getElementById('sim-expense-list');
+  expEl.innerHTML = state.simulation.expenses.length === 0
+    ? ''
+    : state.simulation.expenses.map(e => `
+        <div class="card-elevated p-3 mb-2 flex items-center gap-2">
+          <div class="flex-1">
+            <p class="text-sm font-600">${escHtml(e.name)}</p>
+            <p class="text-xs mono" style="color:var(--text-muted)">${peso(e.total)} over ${e.months} month(s) from ${e.startMonth}</p>
+          </div>
+          <span class="mono text-sm font-700" style="color:var(--rose)">-${peso(e.total / e.months)}/mo</span>
+          <button class="del-btn" onclick="deleteSimExpense('${e.id}')">✕</button>
+        </div>
+      `).join('');
+
+  // Sim income list
+  const incEl = document.getElementById('sim-income-list');
+  incEl.innerHTML = state.simulation.incomes.length === 0
+    ? ''
+    : state.simulation.incomes.map(inc => `
+        <div class="card-elevated p-3 mb-2 flex items-center gap-2">
+          <div class="flex-1">
+            <p class="text-sm font-600">${escHtml(inc.desc)}</p>
+            <p class="text-xs mono" style="color:var(--text-muted)">${peso(inc.amount)} / ${inc.freq}</p>
+          </div>
+          <button class="del-btn" onclick="deleteSimIncome('${inc.id}')">✕</button>
+        </div>
+      `).join('');
+
+  renderSimChart();
+}
+
+// ╔══════════════════════════════════════════════════════╗
+// ║  ADD / DELETE — TRANSACTIONS                         ║
+// ╚══════════════════════════════════════════════════════╝
+function addTransaction() {
+  const type = document.getElementById('tx-type').value;
+  const category = document.getElementById('tx-category').value;
+  const desc = document.getElementById('tx-desc').value.trim();
+  const amount = parseFloat(document.getElementById('tx-amount').value);
+  const date = document.getElementById('tx-date').value || today();
+
+  if (!desc) { toast('Please add a description', 'var(--rose)'); return; }
+  if (!amount || amount <= 0) { toast('Enter a valid amount', 'var(--rose)'); return; }
+
+  state.transactions.push({ id: uid(), type, category, desc, amount, date });
+  saveState();
+  renderLedger();
+  renderDashboard();
+
+  // Reset fields
+  document.getElementById('tx-desc').value = '';
+  document.getElementById('tx-amount').value = '';
+  toast('Transaction added ✓');
+}
+
+function deleteTransaction(id) {
+  state.transactions = state.transactions.filter(tx => tx.id !== id);
+  saveState();
+  renderLedger();
+  renderDashboard();
+  toast('Deleted', 'var(--rose)');
+}
+
+// Convert an "Expected" entry into a real "Money In" transaction.
+// The original expected entry is removed and replaced with a proper income entry,
+// dated today so it counts toward the actual balance immediately.
+function receiveExpected(id) {
+  const tx = state.transactions.find(t => t.id === id);
+  if (!tx || tx.type !== 'expected') return;
+
+  // Animate the row out before mutating state
+  const row = document.getElementById(`exp-row-${id}`);
+  if (row) {
+    row.style.transition = 'opacity 0.3s, transform 0.3s';
+    row.style.opacity = '0';
+    row.style.transform = 'translateX(12px)';
+  }
+
+  setTimeout(() => {
+    // Remove the expected entry
+    state.transactions = state.transactions.filter(t => t.id !== id);
+
+    // Add it back as a real Money In with today's date
+    state.transactions.push({
+      id: uid(),
+      type: 'in',
+      category: 'income',
+      desc: tx.desc + ' (received)',  // mark it as converted so history is clear
+      amount: tx.amount,
+      date: today()
+    });
+
+    saveState();
+    renderLedger();
+    renderDashboard();
+    toast(`+${peso(tx.amount)} added to balance 💚`);
+  }, 280);
+}
+
+// ╔══════════════════════════════════════════════════════╗
+// ║  ADD / DELETE — SUBSCRIPTIONS                        ║
+// ╚══════════════════════════════════════════════════════╝
+function addSubscription() {
+  const name = document.getElementById('sub-name').value.trim();
+  const amount = parseFloat(document.getElementById('sub-amount').value);
+  const billing = document.getElementById('sub-billing').value;
+  const day = parseInt(document.getElementById('sub-date').value) || 1;
+
+  if (!name) { toast('Name the subscription', 'var(--rose)'); return; }
+  if (!amount || amount <= 0) { toast('Enter a valid amount', 'var(--rose)'); return; }
+
+  state.subscriptions.push({ id: uid(), name, amount, billing, day });
+  saveState();
+  renderSubscriptions();
+  renderDashboard();
+
+  document.getElementById('sub-name').value = '';
+  document.getElementById('sub-amount').value = '';
+  document.getElementById('sub-date').value = '';
+  toast('Subscription added ✓');
+}
+
+function deleteSubscription(id) {
+  state.subscriptions = state.subscriptions.filter(s => s.id !== id);
+  saveState();
+  renderSubscriptions();
+  renderDashboard();
+  toast('Subscription removed', 'var(--rose)');
+}
+
+// ╔══════════════════════════════════════════════════════╗
+// ║  ADD / DELETE — SIMULATION                           ║
+// ╚══════════════════════════════════════════════════════╝
+function addSimExpense() {
+  const name = document.getElementById('sim-name').value.trim();
+  const total = parseFloat(document.getElementById('sim-total').value);
+  const months = parseInt(document.getElementById('sim-months').value);
+  const startMonth = document.getElementById('sim-start').value || thisMonth();
+
+  if (!name) { toast('Name the item', 'var(--rose)'); return; }
+  if (!total || total <= 0) { toast('Enter a valid total cost', 'var(--rose)'); return; }
+
+  state.simulation.expenses.push({ id: uid(), name, total, months, startMonth });
+  saveState();
+  renderSimulation();
+
+  document.getElementById('sim-name').value = '';
+  document.getElementById('sim-total').value = '';
+  toast('What-If expense added ✓', 'var(--sky)');
+}
+
+function deleteSimExpense(id) {
+  state.simulation.expenses = state.simulation.expenses.filter(e => e.id !== id);
+  saveState();
+  renderSimulation();
+}
+
+function addSimIncome() {
+  const desc = document.getElementById('siminc-desc').value.trim();
+  const amount = parseFloat(document.getElementById('siminc-amount').value);
+  const freq = document.getElementById('siminc-freq').value;
+
+  if (!desc) { toast('Describe the income', 'var(--rose)'); return; }
+  if (!amount || amount <= 0) { toast('Enter a valid amount', 'var(--rose)'); return; }
+
+  state.simulation.incomes.push({ id: uid(), desc, amount, freq });
+  saveState();
+  renderSimulation();
+
+  document.getElementById('siminc-desc').value = '';
+  document.getElementById('siminc-amount').value = '';
+  toast('Sim income added ✓', 'var(--emerald)');
+}
+
+function deleteSimIncome(id) {
+  state.simulation.incomes = state.simulation.incomes.filter(i => i.id !== id);
+  saveState();
+  renderSimulation();
+}
+
+function clearSimulation() {
+  if (!confirm('Clear all simulation data?')) return;
+  state.simulation = { expenses: [], incomes: [] };
+  saveState();
+  renderSimulation();
+  toast('Simulation cleared', 'var(--rose)');
+}
+
+// ╔══════════════════════════════════════════════════════╗
+// ║  TAB NAVIGATION                                      ║
+// ╚══════════════════════════════════════════════════════╝
+const TABS = ['dashboard', 'ledger', 'subscriptions', 'simulation'];
+
+function switchTab(name) {
+  TABS.forEach(t => {
+    const sec = document.getElementById(`tab-${t}`);
+    const nav = document.querySelector(`[data-tab="${t}"]`);
+    const bnav = document.getElementById(`bnav-${t}`);
+    if (t === name) {
+      sec.classList.remove('hidden');
+      if (nav) nav.classList.add('active');
+      if (bnav) bnav.style.color = t === 'simulation' ? 'var(--sky)' : 'var(--emerald)';
+    } else {
+      sec.classList.add('hidden');
+      if (nav) nav.classList.remove('active');
+      if (bnav) bnav.style.color = 'var(--text-muted)';
+    }
+  });
+
+  // Trigger relevant renders on tab switch
+  if (name === 'dashboard') renderDashboard();
+  if (name === 'ledger') renderLedger();
+  if (name === 'subscriptions') renderSubscriptions();
+  if (name === 'simulation') renderSimulation();
+}
+
+// Open the expected form pre-filled
+function openExpectedForm() {
+  document.getElementById('tx-type').value = 'expected';
+  document.getElementById('tx-category').value = 'expected';
+}
+
+// ╔══════════════════════════════════════════════════════╗
+// ║  DATA MANAGEMENT — Export / Import                   ║
+// ╚══════════════════════════════════════════════════════╝
+function exportData() {
+  const json = JSON.stringify(state, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `mywealth_backup_${today()}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('Data exported ✓');
+}
+
+function importData(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const imported = JSON.parse(e.target.result);
+      // Basic validation
+      if (!imported.transactions || !imported.subscriptions) {
+        toast('Invalid backup file', 'var(--rose)');
+        return;
+      }
+      state = imported;
+      if (!state.simulation) state.simulation = { expenses: [], incomes: [] };
+      saveState();
+      renderDashboard();
+      renderLedger();
+      renderSubscriptions();
+      renderSimulation();
+      toast('Data imported ✓');
+    } catch(err) {
+      toast('Import failed — bad JSON', 'var(--rose)');
+    }
+  };
+  reader.readAsText(file);
+  // Reset file input so same file can be re-imported if needed
+  event.target.value = '';
+}
+
+// ╔══════════════════════════════════════════════════════╗
+// ║  SECURITY — HTML escape                             ║
+// ╚══════════════════════════════════════════════════════╝
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+// ╔══════════════════════════════════════════════════════╗
+// ║  BOOT                                                ║
+// ╚══════════════════════════════════════════════════════╝
+(function init() {
+  // Set default date inputs to today
+  document.getElementById('tx-date').value = today();
+  document.getElementById('sim-start').value = thisMonth();
+
+  // Load persisted data
+  loadState();
+
+  // Initial render
+  renderDashboard();
+  renderLedger();
+
+  console.log('%cMyWealth loaded 💚', 'color:#10b981;font-weight:bold;font-size:16px');
+})();
+</script>
+</body>
+</html>
