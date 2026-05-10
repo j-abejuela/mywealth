@@ -245,21 +245,32 @@
     <!-- Add transaction form -->
     <div class="card p-4 mb-4">
       <h2 class="font-700 text-sm uppercase tracking-wider mb-4" style="color:var(--text-mid)">New Transaction</h2>
-      <div class="grid grid-cols-2 gap-2 mb-2">
-        <select id="tx-type" class="inp" onchange="onTxTypeChange()">
-          <option value="cash">💵 Cash on Hand</option>
-          <option value="in">💚 Money In</option>
-          <option value="out">🔴 Money Out</option>
-          <option value="expected">🟡 Expected</option>
-        </select>
-        <select id="tx-category" class="inp">
-          <option value="cash">Cash / Savings</option>
-          <option value="income">Income</option>
-          <option value="need">Fixed Need</option>
-          <option value="want">Variable Want</option>
-          <option value="expected">Expected</option>
-        </select>
+
+      <!-- Type selector -->
+      <select id="tx-type" class="inp mb-2" onchange="onTxTypeChange()">
+        <option value="cash">💵 Cash on Hand</option>
+        <option value="in">💚 Money In</option>
+        <option value="out">🔴 Money Out</option>
+        <option value="expected">🟡 Expected</option>
+      </select>
+
+      <!-- Need / Want toggle — only visible for Money Out -->
+      <div id="tx-category-row" class="hidden mb-2">
+        <p class="text-xs mb-2" style="color:var(--text-muted)">What kind of expense?</p>
+        <div class="grid grid-cols-2 gap-2">
+          <button type="button" id="cat-need-btn" onclick="selectCategory('need')"
+            class="btn" style="background:var(--bg-elevated);border:2px solid var(--emerald);color:var(--emerald)">
+            🏠 Need
+          </button>
+          <button type="button" id="cat-want-btn" onclick="selectCategory('want')"
+            class="btn" style="background:var(--bg-elevated);border:2px solid var(--border);color:var(--text-muted)">
+            🎮 Want
+          </button>
+        </div>
       </div>
+      <!-- Hidden input carries the selected category value -->
+      <input type="hidden" id="tx-category" value="need" />
+
       <input id="tx-desc" class="inp mb-2" type="text" placeholder="Description (e.g. Salary, Groceries)" />
       <div class="grid grid-cols-2 gap-2 mb-3">
         <input id="tx-amount" class="inp" type="number" min="0" step="0.01" placeholder="Amount (₱)" />
@@ -898,28 +909,38 @@ function renderSimulation() {
 // ╔══════════════════════════════════════════════════════╗
 // ║  ADD / DELETE — TRANSACTIONS                         ║
 // ╚══════════════════════════════════════════════════════╝
-// Auto-set category when transaction type changes
+// Show the Need/Want toggle only when Money Out is selected
 function onTxTypeChange() {
   const type = document.getElementById('tx-type').value;
-  const cat = document.getElementById('tx-category');
-  if (type === 'cash') {
-    cat.value = 'cash';
-    cat.disabled = true;
-  } else if (type === 'in') {
-    cat.disabled = false;
-    cat.value = 'income';
-  } else if (type === 'out') {
-    cat.disabled = false;
-    cat.value = 'need';
-  } else if (type === 'expected') {
-    cat.value = 'expected';
-    cat.disabled = true;
+  const catRow = document.getElementById('tx-category-row');
+  if (type === 'out') {
+    catRow.classList.remove('hidden');
+    selectCategory('need'); // default to Need when switching to Money Out
+  } else {
+    catRow.classList.add('hidden');
+  }
+}
+
+// Toggle the Need / Want buttons and update the hidden category input
+function selectCategory(cat) {
+  document.getElementById('tx-category').value = cat;
+  const needBtn = document.getElementById('cat-need-btn');
+  const wantBtn = document.getElementById('cat-want-btn');
+  if (cat === 'need') {
+    needBtn.style.borderColor = 'var(--emerald)';
+    needBtn.style.color = 'var(--emerald)';
+    wantBtn.style.borderColor = 'var(--border)';
+    wantBtn.style.color = 'var(--text-muted)';
+  } else {
+    wantBtn.style.borderColor = 'var(--rose)';
+    wantBtn.style.color = 'var(--rose)';
+    needBtn.style.borderColor = 'var(--border)';
+    needBtn.style.color = 'var(--text-muted)';
   }
 }
 
 function addTransaction() {
   const type = document.getElementById('tx-type').value;
-  const category = document.getElementById('tx-category').value;
   const desc = document.getElementById('tx-desc').value.trim();
   const amount = parseFloat(document.getElementById('tx-amount').value);
   const date = document.getElementById('tx-date').value || today();
@@ -927,10 +948,14 @@ function addTransaction() {
   if (!desc) { toast('Please add a description', 'var(--rose)'); return; }
   if (!amount || amount <= 0) { toast('Enter a valid amount', 'var(--rose)'); return; }
 
-  // Enforce correct category for cash on hand
-  const finalCategory = type === 'cash' ? 'cash' : category;
+  // Auto-assign category based on type; only Money Out reads the toggle
+  let category;
+  if (type === 'cash')     category = 'cash';
+  else if (type === 'in')  category = 'income';
+  else if (type === 'out') category = document.getElementById('tx-category').value || 'need';
+  else                     category = 'expected';
 
-  state.transactions.push({ id: uid(), type, category: finalCategory, desc, amount, date });
+  state.transactions.push({ id: uid(), type, category, desc, amount, date });
   saveState();
   renderLedger();
   renderDashboard();
@@ -938,7 +963,8 @@ function addTransaction() {
   // Reset fields
   document.getElementById('tx-desc').value = '';
   document.getElementById('tx-amount').value = '';
-  toast(type === 'cash' ? 'Cash on hand saved 💵' : 'Transaction added ✓');
+  const msgs = { cash: 'Cash on hand saved 💵', in: 'Income added 💚', out: 'Expense logged 🔴', expected: 'Expected income saved 🟡' };
+  toast(msgs[type] || 'Transaction added ✓');
 }
 
 function deleteTransaction(id) {
@@ -949,9 +975,9 @@ function deleteTransaction(id) {
   toast('Deleted', 'var(--rose)');
 }
 
-// Convert an "Expected" entry into a real "Money In" transaction.
-// The original expected entry is removed and replaced with a proper income entry,
-// dated today so it counts toward the actual balance immediately.
+// Convert an "Expected" entry into a one-time Cash receipt.
+// Uses type:'cash' so it adds to the real balance but does NOT
+// repeat in the monthly projection — it was a one-time payment, not a salary.
 function receiveExpected(id) {
   const tx = state.transactions.find(t => t.id === id);
   if (!tx || tx.type !== 'expected') return;
@@ -968,12 +994,12 @@ function receiveExpected(id) {
     // Remove the expected entry
     state.transactions = state.transactions.filter(t => t.id !== id);
 
-    // Add it back as a real Money In with today's date
+    // Add as 'cash' — counts toward balance, never repeats in projection
     state.transactions.push({
       id: uid(),
-      type: 'in',
-      category: 'income',
-      desc: tx.desc + ' (received)',  // mark it as converted so history is clear
+      type: 'cash',
+      category: 'cash',
+      desc: tx.desc + ' (received)',
       amount: tx.amount,
       date: today()
     });
