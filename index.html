@@ -568,9 +568,22 @@ function calcBreakdown() {
 // ╠══════════════════════════════════════════════════════╣
 // Returns array of 7 data points (this month + 6 forward)
 // Each: { label, actual, simulated }
+//
+// IMPORTANT: Only subscriptions repeat in the forecast.
+// One-time Money Out entries affect current balance only —
+// they already reduced the balance we start the projection from.
+// Recurring Money In (type:'in') repeats each month as expected income.
+// Cash on Hand (type:'cash') never repeats — it's a one-time amount.
 function buildProjection() {
   const balance = calcBalance();
-  const monthlyNet = calcMonthlyIn() - calcMonthlyOut();
+
+  // Only recurring income repeats in the forecast
+  const recurringMonthlyIn = calcMonthlyIn();
+
+  // Only subscriptions repeat as monthly costs — NOT one-time expenses
+  const recurringMonthlyOut = calcSubMonthly();
+
+  const monthlyNet = recurringMonthlyIn - recurringMonthlyOut;
 
   // Build labels for next 6 months
   const labels = [];
