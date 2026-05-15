@@ -204,10 +204,10 @@
     <!-- Balance trend chart -->
     <div class="card p-4 mb-4">
       <div class="flex items-center justify-between mb-3">
-        <h2 class="font-700 text-sm uppercase tracking-wider" style="color:var(--text-mid)">Balance Trend</h2>
+        <h2 class="font-700 text-sm uppercase tracking-wider" style="color:var(--text-mid)">Balance Trend Scenarios</h2>
         <span class="badge badge-emerald">6 Months</span>
       </div>
-      <div class="chart-wrap">
+      <div class="chart-wrap" style="height:260px">
         <canvas id="balanceChart"></canvas>
       </div>
     </div>
@@ -225,13 +225,24 @@
     </div>
 
     <!-- Expected money list -->
-    <div class="card p-4">
+    <div class="card p-4 mb-4">
       <div class="flex items-center justify-between mb-3">
         <h2 class="font-700 text-sm uppercase tracking-wider" style="color:var(--text-mid)">Expected Income</h2>
         <button onclick="switchTab('ledger'); openExpectedForm()" class="btn btn-amber" style="padding:6px 12px;font-size:12px">+ Add</button>
       </div>
       <div id="expected-list" class="text-sm" style="color:var(--text-mid)">
         <p class="text-xs text-center py-4" style="color:var(--text-muted)">No expected income tracked yet.</p>
+      </div>
+    </div>
+
+    <!-- Expected Liability list -->
+    <div class="card p-4">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="font-700 text-sm uppercase tracking-wider" style="color:var(--text-mid)">Expected Liability</h2>
+        <button onclick="switchTab('ledger'); openExpectedLiabForm()" class="btn btn-rose" style="padding:6px 12px;font-size:12px">+ Add</button>
+      </div>
+      <div id="expected-liab-list" class="text-sm" style="color:var(--text-mid)">
+        <p class="text-xs text-center py-4" style="color:var(--text-muted)">No expected liability tracked yet.</p>
       </div>
     </div>
 
@@ -251,7 +262,8 @@
         <option value="cash">💵 Cash on Hand</option>
         <option value="in">💚 Money In</option>
         <option value="out">🔴 Money Out</option>
-        <option value="expected">🟡 Expected</option>
+        <option value="expected">🟡 Expected Income</option>
+        <option value="expected_liability">🟠 Expected Liability</option>
       </select>
 
       <!-- Need / Want toggle — only visible for Money Out -->
@@ -288,7 +300,8 @@
           <option value="cash">Cash on Hand</option>
           <option value="in">Money In</option>
           <option value="out">Money Out</option>
-          <option value="expected">Expected</option>
+          <option value="expected">Expected Income</option>
+          <option value="expected_liability">Expected Liability</option>
         </select>
       </div>
       <div id="ledger-list" class="ledger-scroll">
@@ -440,14 +453,14 @@
 </nav>
 
 <!-- ══════════════════════════════════════════════════════ -->
-<!-- JAVASCRIPT                                            -->
+<!-- JAVASCRIPT                                             -->
 <!-- ══════════════════════════════════════════════════════ -->
 <script>
 // ╔══════════════════════════════════════════════════════╗
 // ║  STATE — All app data lives here                     ║
 // ╚══════════════════════════════════════════════════════╝
 let state = {
-  transactions: [],   // { id, type:'in'|'out'|'expected', category:'income'|'need'|'want'|'expected', desc, amount, date }
+  transactions: [],   // { id, type:'in'|'out'|'expected'|'expected_liability', category:'income'|'need'|'want'|'expected'|'expected_liability', desc, amount, date }
   subscriptions: [],  // { id, name, amount, billing:'monthly'|'weekly'|'yearly', day }
   simulation: {
     expenses: [],     // { id, name, total, months, startMonth }
@@ -456,7 +469,7 @@ let state = {
 };
 
 // ╔══════════════════════════════════════════════════════╗
-// ║  PERSISTENCE — localStorage save/load               ║
+// ║  PERSISTENCE — localStorage save/load                ║
 // ╚══════════════════════════════════════════════════════╝
 function saveState() {
   localStorage.setItem('mywealth_v2', JSON.stringify(state));
@@ -508,7 +521,7 @@ function calcBalance() {
     if (tx.type === 'cash') return sum + Number(tx.amount); // one-time starting cash
     if (tx.type === 'in') return sum + Number(tx.amount);
     if (tx.type === 'out') return sum - Number(tx.amount);
-    return sum; // 'expected' not counted in real balance
+    return sum; // 'expected' and 'expected_liability' not counted in real balance
   }, 0);
 }
 
@@ -516,6 +529,13 @@ function calcBalance() {
 function calcExpected() {
   return state.transactions
     .filter(tx => tx.type === 'expected')
+    .reduce((sum, tx) => sum + Number(tx.amount), 0);
+}
+
+// Total expected liability
+function calcExpectedLiability() {
+  return state.transactions
+    .filter(tx => tx.type === 'expected_liability')
     .reduce((sum, tx) => sum + Number(tx.amount), 0);
 }
 
@@ -566,26 +586,17 @@ function calcBreakdown() {
 // ╔══════════════════════════════════════════════════════╗
 // ║  PROJECTION ENGINE                                   ║
 // ╠══════════════════════════════════════════════════════╣
-// Returns array of 7 data points (this month + 6 forward)
-// Each: { label, actual, simulated }
-//
-// IMPORTANT: Only subscriptions repeat in the forecast.
-// One-time Money Out entries affect current balance only —
-// they already reduced the balance we start the projection from.
-// Recurring Money In (type:'in') repeats each month as expected income.
-// Cash on Hand (type:'cash') never repeats — it's a one-time amount.
 function buildProjection() {
   const balance = calcBalance();
 
-  // Only recurring income repeats in the forecast
   const recurringMonthlyIn = calcMonthlyIn();
-
-  // Only subscriptions repeat as monthly costs — NOT one-time expenses
   const recurringMonthlyOut = calcSubMonthly();
-
   const monthlyNet = recurringMonthlyIn - recurringMonthlyOut;
 
-  // Build labels for next 6 months
+  // New Variables for the 3 line scenarios
+  const expectedIn = calcExpected();
+  const expectedLiab = calcExpectedLiability();
+
   const labels = [];
   const dates = [];
   const now = new Date();
@@ -595,14 +606,20 @@ function buildProjection() {
     dates.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
   }
 
-  // Actual trajectory (no simulation)
+  // Line 1: Actual trajectory (no simulation)
   const actual = [balance];
+  // Line 2: Actual + Expected Income
+  const actualWithExpectedIn = [balance + expectedIn];
+  // Line 3: Actual - Expected Liability
+  const actualWithExpectedLiab = [balance - expectedLiab];
+
   for (let i = 1; i <= 6; i++) {
     actual.push(actual[i - 1] + monthlyNet);
+    actualWithExpectedIn.push(actualWithExpectedIn[i - 1] + monthlyNet);
+    actualWithExpectedLiab.push(actualWithExpectedLiab[i - 1] + monthlyNet);
   }
 
   // Simulation trajectory
-  // Calculate monthly sim income
   let simMonthlyIncome = 0;
   state.simulation.incomes.forEach(inc => {
     switch (inc.freq) {
@@ -612,7 +629,6 @@ function buildProjection() {
     }
   });
 
-  // Map sim expenses into monthly costs per month label
   const simExpenseByMonth = {};
   state.simulation.expenses.forEach(exp => {
     const monthly = Number(exp.total) / Number(exp.months);
@@ -633,7 +649,7 @@ function buildProjection() {
     simulated.push(simulated[i - 1] + simNet);
   }
 
-  return { labels, actual, simulated };
+  return { labels, actual, simulated, actualWithExpectedIn, actualWithExpectedLiab };
 }
 
 // ╔══════════════════════════════════════════════════════╗
@@ -655,7 +671,7 @@ const chartDefaults = {
 
 function renderBalanceChart() {
   const ctx = document.getElementById('balanceChart').getContext('2d');
-  const { labels, actual } = buildProjection();
+  const { labels, actual, actualWithExpectedIn, actualWithExpectedLiab } = buildProjection();
 
   if (balanceChartInstance) balanceChartInstance.destroy();
 
@@ -667,19 +683,50 @@ function renderBalanceChart() {
     type: 'line',
     data: {
       labels,
-      datasets: [{
-        label: 'Balance',
-        data: actual,
-        borderColor: '#10b981',
-        backgroundColor: gradient,
-        borderWidth: 2.5,
-        pointBackgroundColor: '#10b981',
-        pointRadius: 4,
-        tension: 0.4,
-        fill: true
-      }]
+      datasets: [
+        {
+          label: 'Actual Balance',
+          data: actual,
+          borderColor: '#10b981',
+          backgroundColor: gradient,
+          borderWidth: 2.5,
+          pointBackgroundColor: '#10b981',
+          pointRadius: 4,
+          tension: 0.4,
+          fill: true
+        },
+        {
+          label: '+ Expected Money',
+          data: actualWithExpectedIn,
+          borderColor: '#f59e0b', // Amber color
+          borderWidth: 2,
+          borderDash: [5, 5],
+          pointBackgroundColor: '#f59e0b',
+          pointRadius: 3,
+          tension: 0.4,
+          fill: false
+        },
+        {
+          label: '- Expected Liability',
+          data: actualWithExpectedLiab,
+          borderColor: '#f43f5e', // Rose color
+          borderWidth: 2,
+          borderDash: [5, 5],
+          pointBackgroundColor: '#f43f5e',
+          pointRadius: 3,
+          tension: 0.4,
+          fill: false
+        }
+      ]
     },
-    options: { ...chartDefaults }
+    options: { 
+      ...chartDefaults,
+      plugins: {
+        ...chartDefaults.plugins,
+        // Override default here to show the legend specifically for this chart
+        legend: { display: true, labels: { color: '#8fa0a8', boxWidth: 12, font: { family: 'DM Mono', size: 10 } } }
+      }
+    }
   });
 }
 
@@ -778,7 +825,7 @@ function renderDashboard() {
   document.getElementById('stat-expected').textContent = peso(calcExpected());
   document.getElementById('stat-burn').textContent = peso(calcSubMonthly());
 
-  // Expected list
+  // Expected income list
   const expectedTxs = state.transactions.filter(tx => tx.type === 'expected');
   const el = document.getElementById('expected-list');
   if (expectedTxs.length === 0) {
@@ -805,6 +852,33 @@ function renderDashboard() {
     `).join('');
   }
 
+  // Expected liability list
+  const expectedLiabTxs = state.transactions.filter(tx => tx.type === 'expected_liability');
+  const elLiab = document.getElementById('expected-liab-list');
+  if (expectedLiabTxs.length === 0) {
+    elLiab.innerHTML = '<p class="text-xs text-center py-4" style="color:var(--text-muted)">No expected liability tracked yet.</p>';
+  } else {
+    elLiab.innerHTML = expectedLiabTxs.map(tx => `
+      <div class="ledger-row" id="exp-row-${tx.id}">
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 mb-0.5">
+            <span class="badge badge-rose">Liability</span>
+          </div>
+          <p class="text-sm font-600 truncate">${escHtml(tx.desc)}</p>
+          <p class="text-xs mono" style="color:var(--text-muted)">${tx.date || 'No date'}</p>
+        </div>
+        <span class="mono font-700 text-sm flex-shrink-0 mr-2" style="color:var(--rose)">-${peso(tx.amount)}</span>
+        <button
+          onclick="payLiability('${tx.id}')"
+          class="btn btn-rose flex-shrink-0"
+          style="padding:6px 10px;font-size:11px;gap:4px"
+          title="Mark as paid — deducts from actual balance">
+          ✓ Pay
+        </button>
+      </div>
+    `).join('');
+  }
+
   renderBalanceChart();
   renderBreakdownChart();
 }
@@ -826,16 +900,21 @@ function renderLedger() {
   el.innerHTML = txs.map(tx => {
     const isIn = tx.type === 'in';
     const isExp = tx.type === 'expected';
+    const isExpLiab = tx.type === 'expected_liability';
     const isCash = tx.type === 'cash';
-    const amtColor = (isIn || isCash) ? 'var(--emerald)' : isExp ? 'var(--amber)' : 'var(--rose)';
-    const prefix = (isIn || isCash) ? '+' : isExp ? '~' : '-';
-    const catClass = { income: 'cat-income', need: 'cat-need', want: 'cat-want', expected: 'cat-expected', cash: 'cat-cash' }[tx.category] || 'cat-want';
-    const catLabel = { income: 'Income', need: 'Fixed Need', want: 'Want', expected: 'Expected', cash: 'Cash on Hand' }[tx.category] || tx.category;
+    
+    const amtColor = (isIn || isCash) ? 'var(--emerald)' : (isExp ? 'var(--amber)' : 'var(--rose)');
+    const prefix = (isIn || isCash) ? '+' : (isExp ? '~' : (isExpLiab ? '~-' : '-'));
+    const catClass = { income: 'cat-income', need: 'cat-need', want: 'cat-want', expected: 'cat-expected', expected_liability: 'cat-want', cash: 'cat-cash' }[tx.category] || 'cat-want';
+    const catLabel = { income: 'Income', need: 'Fixed Need', want: 'Want', expected: 'Expected', expected_liability: 'Exp. Liability', cash: 'Cash on Hand' }[tx.category] || tx.category;
 
-    // Show "Got it" button only for expected entries
-    const receivedBtn = isExp
-      ? `<button onclick="receiveExpected('${tx.id}')" class="btn btn-emerald flex-shrink-0" style="padding:5px 9px;font-size:11px" title="Mark as received">✓ Got it</button>`
-      : '';
+    // Show action buttons based on expected type
+    let actionBtn = '';
+    if (isExp) {
+        actionBtn = `<button onclick="receiveExpected('${tx.id}')" class="btn btn-emerald flex-shrink-0" style="padding:5px 9px;font-size:11px" title="Mark as received">✓ Got it</button>`;
+    } else if (isExpLiab) {
+        actionBtn = `<button onclick="payLiability('${tx.id}')" class="btn btn-rose flex-shrink-0" style="padding:5px 9px;font-size:11px" title="Mark as paid">✓ Pay</button>`;
+    }
 
     return `
       <div class="ledger-row" id="exp-row-${tx.id}">
@@ -847,7 +926,7 @@ function renderLedger() {
           <p class="text-xs mono" style="color:var(--text-muted)">${tx.date || '—'}</p>
         </div>
         <span class="mono font-700 text-sm flex-shrink-0" style="color:${amtColor}">${prefix}${peso(tx.amount)}</span>
-        ${receivedBtn}
+        ${actionBtn}
         <button class="del-btn" onclick="deleteTransaction('${tx.id}')" title="Delete">✕</button>
       </div>
     `;
@@ -963,10 +1042,11 @@ function addTransaction() {
 
   // Auto-assign category based on type; only Money Out reads the toggle
   let category;
-  if (type === 'cash')     category = 'cash';
+  if (type === 'cash')      category = 'cash';
   else if (type === 'in')  category = 'income';
   else if (type === 'out') category = document.getElementById('tx-category').value || 'need';
-  else                     category = 'expected';
+  else if (type === 'expected') category = 'expected';
+  else if (type === 'expected_liability') category = 'expected_liability';
 
   state.transactions.push({ id: uid(), type, category, desc, amount, date });
   saveState();
@@ -976,7 +1056,7 @@ function addTransaction() {
   // Reset fields
   document.getElementById('tx-desc').value = '';
   document.getElementById('tx-amount').value = '';
-  const msgs = { cash: 'Cash on hand saved 💵', in: 'Income added 💚', out: 'Expense logged 🔴', expected: 'Expected income saved 🟡' };
+  const msgs = { cash: 'Cash on hand saved 💵', in: 'Income added 💚', out: 'Expense logged 🔴', expected: 'Expected income saved 🟡', expected_liability: 'Expected liability saved 🟠' };
   toast(msgs[type] || 'Transaction added ✓');
 }
 
@@ -989,13 +1069,10 @@ function deleteTransaction(id) {
 }
 
 // Convert an "Expected" entry into a one-time Cash receipt.
-// Uses type:'cash' so it adds to the real balance but does NOT
-// repeat in the monthly projection — it was a one-time payment, not a salary.
 function receiveExpected(id) {
   const tx = state.transactions.find(t => t.id === id);
   if (!tx || tx.type !== 'expected') return;
 
-  // Animate the row out before mutating state
   const row = document.getElementById(`exp-row-${id}`);
   if (row) {
     row.style.transition = 'opacity 0.3s, transform 0.3s';
@@ -1004,10 +1081,8 @@ function receiveExpected(id) {
   }
 
   setTimeout(() => {
-    // Remove the expected entry
     state.transactions = state.transactions.filter(t => t.id !== id);
 
-    // Add as 'cash' — counts toward balance, never repeats in projection
     state.transactions.push({
       id: uid(),
       type: 'cash',
@@ -1021,6 +1096,37 @@ function receiveExpected(id) {
     renderLedger();
     renderDashboard();
     toast(`+${peso(tx.amount)} added to balance 💚`);
+  }, 280);
+}
+
+// Convert an "Expected Liability" entry into a recorded "Money Out" expense.
+function payLiability(id) {
+  const tx = state.transactions.find(t => t.id === id);
+  if (!tx || tx.type !== 'expected_liability') return;
+
+  const row = document.getElementById(`exp-row-${id}`);
+  if (row) {
+    row.style.transition = 'opacity 0.3s, transform 0.3s';
+    row.style.opacity = '0';
+    row.style.transform = 'translateX(12px)';
+  }
+
+  setTimeout(() => {
+    state.transactions = state.transactions.filter(t => t.id !== id);
+
+    state.transactions.push({
+      id: uid(),
+      type: 'out',
+      category: 'need', // defaults to a fixed need 
+      desc: tx.desc + ' (paid)',
+      amount: tx.amount,
+      date: today()
+    });
+
+    saveState();
+    renderLedger();
+    renderDashboard();
+    toast(`-${peso(tx.amount)} paid 🔴`, 'var(--rose)');
   }, 280);
 }
 
@@ -1145,6 +1251,14 @@ function switchTab(name) {
 function openExpectedForm() {
   document.getElementById('tx-type').value = 'expected';
   document.getElementById('tx-category').value = 'expected';
+  onTxTypeChange();
+}
+
+// Open the expected liability form pre-filled
+function openExpectedLiabForm() {
+  document.getElementById('tx-type').value = 'expected_liability';
+  document.getElementById('tx-category').value = 'expected_liability';
+  onTxTypeChange();
 }
 
 // ╔══════════════════════════════════════════════════════╗
@@ -1192,7 +1306,7 @@ function importData(event) {
 }
 
 // ╔══════════════════════════════════════════════════════╗
-// ║  SECURITY — HTML escape                             ║
+// ║  SECURITY — HTML escape                              ║
 // ╚══════════════════════════════════════════════════════╝
 function escHtml(str) {
   return String(str)
